@@ -34,9 +34,15 @@ enum Store {
     }
 }
 
-/// A corner panel that floats over other windows without taking keyboard focus from them.
+/// The small panel at the top that floats over other windows without taking keyboard focus.
 final class CardPanel: NSPanel {
     override var canBecomeMain: Bool { false }
+}
+
+/// The full-screen snack. Borderless windows can't take the keyboard unless told they can (for esc).
+final class SnackWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -48,7 +54,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var recent: [String] = []
     private var rng = SystemRandomNumberGenerator()
     private var panel: CardPanel?
+    private var full: SnackWindow?
     private var card: CardModel?
+    /// The app you were in before the full-screen snack, to hand focus back to.
+    private var previousApp: NSRunningApplication?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -59,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(timer!, forMode: .common)
         if CommandLine.arguments.contains("--demo") { showCard() }
+        if CommandLine.arguments.contains("--demo-full") { showCard(); goFull() }
     }
 
     private var isPaused: Bool {
@@ -94,12 +104,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Store.log("another", next)
             return next
         }
-        model.onStart = { [weak model] in Store.log("start", model?.move) }
+        model.onYes = { [weak self] in self?.goFull() }
         model.onEnd = { [weak self] outcome in self?.closeCard(outcome) }
         card = model
         Store.log("shown", move)
 
-        let host = NSHostingView(rootView: CardView(model: model))
+        let host = NSHostingView(rootView: PromptView(model: model))
         let size = host.fittingSize
         let panel = CardPanel(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -110,17 +120,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
-        // Left out of screen shares and recordings; --demo lets a screenshot see it.
-        panel.sharingType = CommandLine.arguments.contains("--demo") ? .readOnly : .none
+        panel.sharingType = sharing
         panel.contentView = host
+        // Top centre, just under the menu bar.
         if let screen = NSScreen.main {
             let v = screen.visibleFrame
-            panel.setFrameOrigin(NSPoint(x: v.maxX - size.width - 20, y: v.minY + 20))
+            panel.setFrameOrigin(NSPoint(x: v.midX - size.width / 2, y: v.maxY - size.height - 12))
         }
-        panel.alphaValue = 0
-        panel.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { $0.duration = 0.35; panel.animator().alphaValue = 1 }
+        fadeIn(panel)
         self.panel = panel
+    }
+
+    /// Left out of screen shares and recordings; the --demo flags let a screenshot see it.
+    private var sharing: NSWindow.SharingType {
+        CommandLine.arguments.contains(where: { $0.hasPrefix("--demo") }) ? .readOnly : .none
+    }
+
+    private func fadeIn(_ w: NSWindow) {
+        w.alphaValue = 0
+        w.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { $0.duration = 0.35; w.animator().alphaValue = 1 }
+    }
+
+    private func fadeOut(_ w: NSWindow?) {
+        NSAnimationContext.runAnimationGroup({ $0.duration = 0.3; w?.animator().alphaValue = 0 },
+                                             completionHandler: { w?.orderOut(nil) })
+    }
+
+    /// Yes: the small card goes and the snack fills the screen, countdown running.
+    private func goFull() {
+        guard let model = card, full == nil, let screen = NSScreen.main else { return }
+        Store.log("start", model.move)
+        fadeOut(panel)
+        panel = nil
+
+        let window = SnackWindow(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.level = .screenSaver  // over the menu bar, the Dock and full-screen apps
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        window.sharingType = sharing
+        window.contentView = NSHostingView(rootView: SnackView(model: model))
+        window.setFrame(screen.frame, display: true)
+        previousApp = NSWorkspace.shared.frontmostApplication
+        fadeIn(window)
+        window.makeKey()
+        NSApp.activate(ignoringOtherApps: true)
+        full = window
+        model.start()
     }
 
     private func closeCard(_ outcome: Outcome) {
@@ -128,10 +174,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Store.log(outcome.rawValue, model.move)
         if outcome == .later { rhythm.snooze() } else { rhythm.reset() }
         card = nil
-        let panel = self.panel
-        self.panel = nil
-        NSAnimationContext.runAnimationGroup({ $0.duration = 0.3; panel?.animator().alphaValue = 0 },
-                                             completionHandler: { panel?.orderOut(nil) })
+        fadeOut(panel)
+        panel = nil
+        if let window = full {
+            fadeOut(window)
+            full = nil
+            previousApp?.activate()
+            previousApp = nil
+        }
     }
 
     // MARK: Menu
@@ -199,10 +249,10 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--snapshot" {
         finished.stage = .finished
         let figures = ["squat", "calf", "wallpush", "march", "lunge", "jacks", "armcircle", "reach", "twist", "neck", "chest"]
         let view = VStack(alignment: .leading, spacing: 16) {
+            PromptView(model: CardModel(move: moves[0]), figureAt: 0.6)
             HStack(spacing: 16) {
-                CardView(model: CardModel(move: moves[0]), figureAt: 0.6)
-                CardView(model: running, figureAt: 0.5)
-                CardView(model: finished, figureAt: 0)
+                SnackView(model: running, figureAt: 0.5).frame(width: 720, height: 450).clipped()
+                SnackView(model: finished, figureAt: 0).frame(width: 720, height: 450).clipped()
             }
             ForEach([0.0, 0.5], id: \.self) { phase in
                 HStack(spacing: 10) {
