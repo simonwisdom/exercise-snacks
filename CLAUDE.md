@@ -1,4 +1,4 @@
-# Snacks
+# Exercise Snacks
 
 Swift package, macOS 13+. Timing rules and the moves-file parser live in `Sources/SnackCore` and have
 tests (`swift test`); the AppKit/SwiftUI app is `Sources/Snacks`. Build with `bin/build`. See
