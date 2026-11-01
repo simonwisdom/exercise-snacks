@@ -16,6 +16,9 @@ enum night {
     static let edge = Color(red: 0.29, green: 0.31, blue: 0.44)
 }
 
+/// "45 sec", or "3 min" for whole minutes.
+func length(_ seconds: Int) -> String { seconds >= 60 && seconds % 60 == 0 ? "\(seconds / 60) min" : "\(seconds) sec" }
+
 /// "0:32" for 32 seconds.
 func clock(_ seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
 
@@ -30,6 +33,8 @@ final class CardModel: ObservableObject {
 
     /// Swaps in another move; set by whoever shows the card.
     var another: () -> Move? = { nil }
+    /// Turns the current move off for good and gives another; set by whoever shows the card.
+    var notForMe: () -> Move? = { nil }
     /// Called once when the snack should go.
     var onEnd: (Outcome) -> Void = { _ in }
     /// Called when Yes is pressed on the small card.
@@ -65,8 +70,11 @@ final class CardModel: ObservableObject {
     func stop() { timer?.invalidate(); onEnd(.stopped) }
     func later(_ minutes: Int) { laterMinutes = minutes; onEnd(.later) }
 
-    func swap() {
-        guard let next = another() else { return }
+    func swap() { use(another()) }
+    func dropMove() { use(notForMe()) }
+
+    private func use(_ next: Move?) {
+        guard let next else { return }
         move = next
         if stage == .running { start() } else { remaining = next.seconds }
     }
@@ -78,9 +86,10 @@ final class CardModel: ObservableObject {
 struct Rings: View {
     var count = 4
     var at: Double? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        if let at { draw(at) } else { TimelineView(.animation) { tl in draw(tl.date.timeIntervalSinceReferenceDate) } }
+        if let at = at ?? (reduceMotion ? 0 : nil) { draw(at) } else { TimelineView(.animation) { tl in draw(tl.date.timeIntervalSinceReferenceDate) } }
     }
 
     private func draw(_ t: Double) -> some View {
@@ -123,15 +132,15 @@ struct PromptView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Rings(count: 3, at: figureAt).frame(width: 26, height: 26)
+            Rings(count: 3, at: figureAt).frame(width: 26, height: 26).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("A short pause").font(.system(size: 13, weight: .light)).foregroundStyle(night.ink)
-                Text("\(model.move.title.lowercased()) · \(model.move.seconds) sec")
+                Text("\(model.move.title.lowercased()) · \(length(model.move.seconds))")
                     .font(.system(size: 11, weight: .light)).foregroundStyle(night.muted)
             }
             Spacer(minLength: 12)
-            QuietButton(title: "+5") { model.later(5) }
-            QuietButton(title: "+15") { model.later(15) }
+            QuietButton(title: "+5") { model.later(5) }.accessibilityLabel("Later, in 5 minutes")
+            QuietButton(title: "+15") { model.later(15) }.accessibilityLabel("Later, in 15 minutes")
             QuietButton(title: "Begin", outlined: true, action: model.yes)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
@@ -139,6 +148,8 @@ struct PromptView: View {
         .background(night.bg, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(night.edge.opacity(0.6)))
         .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Snack: \(model.move.title), \(model.move.seconds) seconds")
     }
 }
 
@@ -159,14 +170,16 @@ struct SnackView: View {
     private func screen(ring: CGFloat) -> some View {
         ZStack {
             night.bg.ignoresSafeArea()
-            Rings(at: figureAt).ignoresSafeArea()
+            Rings(at: figureAt).ignoresSafeArea().accessibilityHidden(true)
             Circle().trim(from: 0, to: progress)
                 .stroke(night.line.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.25), value: progress)
                 .frame(width: ring, height: ring)
+                .accessibilityHidden(true)
             FigureView(figure: model.move.figure, at: figureAt, color: night.ink, thin: true)
                 .frame(width: ring * 0.4, height: ring * 0.62)
+                .accessibilityLabel(model.move.title)
             VStack(spacing: 10) {
                 Text(model.move.title.lowercased())
                     .font(.system(size: 22, weight: .light)).tracking(1.5)
@@ -181,8 +194,11 @@ struct SnackView: View {
                     .font(.system(size: model.stage == .finished ? 22 : 44, weight: .ultraLight).monospacedDigit())
                     .tracking(3)
                     .foregroundStyle(night.soft)
+                    .accessibilityLabel(model.stage == .finished ? "Done" : "\(model.remaining) seconds left")
                 HStack(spacing: 20) {
-                    QuietButton(title: "another move", action: model.swap)
+                    QuietButton(title: "another move  →", action: model.swap).keyboardShortcut(.rightArrow, modifiers: [])
+                    QuietButton(title: "not for me", action: model.dropMove)
+                        .accessibilityHint("Turns this move off. Turn moves back on from the menu.")
                     Button(action: model.stop) {
                         Text("stop  esc").font(.system(size: 12, weight: .light)).foregroundStyle(night.muted)
                     }

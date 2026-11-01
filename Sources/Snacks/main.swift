@@ -9,6 +9,43 @@ enum Store {
         .appendingPathComponent("Snacks", isDirectory: true)
     static let movesFile = folder.appendingPathComponent("moves.md")
     static let logFile = folder.appendingPathComponent("log.jsonl")
+    /// Moves turned off with "not for me", one title a line.
+    static let offFile = folder.appendingPathComponent("off.txt")
+
+    static func off() -> Set<String> {
+        let text = (try? String(contentsOf: offFile, encoding: .utf8)) ?? ""
+        return Set(text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty })
+    }
+
+    static func turnOff(_ title: String) {
+        let lines = (off().union([title])).sorted().joined(separator: "\n") + "\n"
+        try? lines.write(to: offFile, atomically: true, encoding: .utf8)
+    }
+
+    static func turnAllOn() { try? "".write(to: offFile, atomically: true, encoding: .utf8) }
+
+    /// The logged events since `since`, as (event, move title) pairs.
+    static func events(since: Date) -> [(event: String, move: String)] {
+        let text = (try? String(contentsOf: logFile, encoding: .utf8)) ?? ""
+        let iso = ISO8601DateFormatter()
+        return text.split(separator: "\n").compactMap { line in
+            guard let data = line.data(using: .utf8),
+                  let row = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+                  let at = row["at"].flatMap(iso.date(from:)), at >= since else { return nil }
+            return (row["event"] ?? "", row["move"] ?? "")
+        }
+    }
+
+    /// One plain sentence about the last seven days, to send to someone if you like.
+    static func weekSummary() -> String {
+        let events = Store.events(since: Date().addingTimeInterval(-7 * 86400)).filter { $0.event == "done" }
+        let moves = Dictionary(Store.moves().map { ($0.title, $0) }, uniquingKeysWith: { a, _ in a })
+        let hard = events.filter { moves[$0.move]?.kind == "vigorous" }.count
+        let minutes = events.compactMap { moves[$0.move]?.seconds }.reduce(0, +) / 60
+        return "My movement snacks this week: \(events.count) done, \(hard) of them out of breath, "
+            + "about \(minutes) minutes of moving between bits of work."
+    }
 
     /// The moves from the file, which is written from the seed the first time.
     static func moves() -> [Move] {
@@ -49,6 +86,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var rhythm = Rhythm()
     private var timer: Timer?
+    private let meetings = Meetings()
+    /// Snack cards shown today, for the daily cap and to make every third one vigorous.
+    private var shownToday = 0
+    private var today = Calendar.current.startOfDay(for: Date())
     private var lastTick = Date()
     private var pausedUntil: Date?
     private var recent: [String] = []
@@ -65,8 +106,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+        Settings.register()
+        shownToday = Store.events(since: today).filter { $0.event == "shown" }.count
+        meetings.ask()
+        Focus.ask()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(timer!, forMode: .common)
+        // `--open-at-login` turns on Open at login once, for installing from the command line.
+        if CommandLine.arguments.contains("--open-at-login"), SMAppService.mainApp.status != .enabled {
+            toggleLogin()
+        }
         if CommandLine.arguments.contains("--demo") { showCard() }
         if CommandLine.arguments.contains("--demo-full") { showCard(); goFull() }
     }
@@ -81,7 +130,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let now = Date()
         let dt = now.timeIntervalSince(lastTick)
         lastTick = now
-        let signals = Mac.signals()
+        let day = Calendar.current.startOfDay(for: now)
+        if day != today { today = day; shownToday = 0 }
+        let hour = Calendar.current.component(.hour, from: now)
+        let quiet = Settings.isQuiet(hour: hour) || shownToday >= Settings.dailyCap
+        let signals = Mac.signals(meetings: meetings, quiet: quiet)
         if card != nil {
             // Nobody answered and they've stepped away: that was a break of its own.
             if rhythm.wasAway(signals), card?.stage == .offer { closeCard(.away) }
@@ -90,19 +143,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if rhythm.tick(dt, signals), !isPaused { showCard() }
     }
 
-    private func nextMove() -> Move? {
-        guard let move = Moves.pick(Store.moves(), avoiding: recent, using: &rng) else { return nil }
+    private func nextMove(kind: String? = nil) -> Move? {
+        guard let move = Moves.pick(Store.moves(), avoiding: recent, off: Store.off(), kind: kind, using: &rng)
+        else { return nil }
         recent = Array((recent + [move.title]).suffix(4))
         return move
     }
 
     private func showCard() {
-        guard card == nil, let move = nextMove() else { return }
+        let kind = rhythm.afterLunch ? "walk" : Moves.kind(forSnack: shownToday + 1)
+        guard card == nil, let move = nextMove(kind: kind) else { return }
+        shownToday += 1
         let model = CardModel(move: move)
         model.another = { [weak self] in
             let next = self?.nextMove()
             Store.log("another", next)
             return next
+        }
+        model.notForMe = { [weak self] in
+            guard let self, let model = self.card else { return nil }
+            Store.turnOff(model.move.title)
+            Store.log("off", model.move)
+            return self.nextMove()
         }
         model.onYes = { [weak self] in self?.goFull() }
         model.onEnd = { [weak self] outcome in self?.closeCard(outcome) }
@@ -205,6 +267,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Snack now", #selector(snackNow), key: "s"))
         menu.addItem(isPaused ? item("Resume", #selector(resume)) : item("Pause for an hour", #selector(pauseHour)))
         menu.addItem(item("Edit moves…", #selector(editMoves)))
+        let off = Store.off().count
+        if off > 0 { menu.addItem(item("Turn moves back on (\(off) off)", #selector(turnAllOn))) }
+        menu.addItem(item("Share this week…", #selector(shareWeek)))
         let login = item("Open at login", #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
@@ -226,6 +291,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func editMoves() {
         _ = Store.moves()  // makes sure the file exists
         NSWorkspace.shared.open(Store.movesFile)
+    }
+
+    @objc private func turnAllOn() { Store.turnAllOn() }
+
+    @objc private func shareWeek() {
+        guard let button = statusItem.button else { return }
+        NSSharingServicePicker(items: [Store.weekSummary()]).show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
     @objc private func toggleLogin() {

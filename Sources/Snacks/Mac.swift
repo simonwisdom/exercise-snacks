@@ -2,10 +2,16 @@ import AppKit
 import CoreAudio
 import SnackCore
 
-/// Reads what the Mac is doing right now, with no permissions needed.
+/// Reads what the Mac is doing right now. The calendar and Focus need permission; without it
+/// they simply never hold a snack back.
 enum Mac {
-    static func signals() -> Signals {
-        Signals(idle: idleSeconds(), micInUse: micInUse(), fullScreen: frontAppFillsScreen())
+    static func signals(meetings: Meetings, quiet: Bool) -> Signals {
+        let now = Date()
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: now)
+        let meeting = meetings.state(now)
+        return Signals(idle: idleSeconds(), micInUse: micInUse(), fullScreen: frontAppFillsScreen(),
+                       meetingSoon: meeting.soon, meetingJustEnded: meeting.justEnded, focusOn: Focus.isOn,
+                       quiet: quiet, hour: Double(parts.hour ?? 10) + Double(parts.minute ?? 0) / 60)
     }
 
     /// Seconds since the last key press, click or mouse move, from any app.

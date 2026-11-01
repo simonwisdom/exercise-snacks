@@ -139,10 +139,12 @@ struct FigureView: View {
     var color: Color = .accentColor
     /// Fine lines and an outlined head, with no floor shadow.
     var thin = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let move = FigureMove.named(figure)
-        if let at {
+        // With Reduce Motion on, hold the move's middle pose instead of looping.
+        if let at = at ?? (reduceMotion ? move.period / 2 : nil) {
             canvas(move, at)
         } else {
             TimelineView(.animation) { tl in

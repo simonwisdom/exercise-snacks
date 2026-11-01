@@ -65,6 +65,45 @@ final class RhythmTests: XCTestCase {
         XCTAssertTrue(use(&r, seconds: 61, paused))
     }
 
+    func testHoldsOffForMeetingsFocusAndQuietHours() {
+        var r = Rhythm()
+        _ = use(&r, seconds: 30 * 60, typing)
+        XCTAssertFalse(r.tick(1, Signals(idle: 6, meetingSoon: true)))
+        XCTAssertFalse(r.tick(1, Signals(idle: 6, focusOn: true)))
+        XCTAssertFalse(r.tick(1, Signals(idle: 6, quiet: true)))
+        XCTAssertTrue(r.tick(1, paused))
+    }
+
+    func testEndOfMeetingBringsASnackForward() {
+        var r = Rhythm()
+        _ = use(&r, seconds: 15 * 60, typing)
+        XCTAssertFalse(r.tick(1, Signals(idle: 0.5, meetingJustEnded: true)))  // too early
+        _ = use(&r, seconds: 6 * 60, typing)
+        XCTAssertTrue(r.tick(1, Signals(idle: 0.5, meetingJustEnded: true)))   // within 10 min of due
+    }
+
+    func testLunchBreakBringsAWalkForward() {
+        var r = Rhythm()
+        _ = use(&r, seconds: 5 * 60, typing)
+        XCTAssertFalse(r.tick(1, Signals(idle: 25 * 60, hour: 13)))
+        XCTAssertFalse(r.tick(1, Signals(idle: 0.5, hour: 13.4)))
+        XCTAssertTrue(r.afterLunch)
+        XCTAssertEqual(r.minutesLeft, 10)
+        r.reset()
+        XCTAssertFalse(r.afterLunch)
+    }
+
+    func testShortOrEveningBreaksAreNotLunch() {
+        var r = Rhythm()
+        _ = r.tick(1, Signals(idle: 10 * 60, hour: 13))
+        _ = r.tick(1, Signals(idle: 0.5, hour: 13.2))
+        XCTAssertFalse(r.afterLunch)
+        _ = r.tick(1, Signals(idle: 40 * 60, hour: 18))
+        _ = r.tick(1, Signals(idle: 0.5, hour: 18.7))
+        XCTAssertFalse(r.afterLunch)
+        XCTAssertEqual(r.minutesLeft, 30)
+    }
+
     func testResetStartsAgain() {
         var r = Rhythm()
         _ = use(&r, seconds: 30 * 60, typing)
@@ -77,10 +116,12 @@ final class RhythmTests: XCTestCase {
 final class MovesTests: XCTestCase {
     func testSeedParsesEveryMove() {
         let moves = Moves.parse(Moves.seed)
-        XCTAssertEqual(moves.count, 13)
-        XCTAssertEqual(moves.first, Move(title: "Squats", seconds: 45, figure: "squat",
-            text: "Feet shoulder-width apart. Sit back as if into a chair, chest up, then stand. Ten to fifteen."))
-        XCTAssertTrue(moves.allSatisfy { !$0.text.isEmpty })
+        XCTAssertEqual(moves.count, 14)
+        XCTAssertEqual(moves.first?.title, "Brisk walk")
+        XCTAssertEqual(moves.first?.seconds, 180)
+        XCTAssertEqual(moves.first?.kind, "walk")
+        XCTAssertEqual(moves.filter { $0.kind == "vigorous" }.count, 3)
+        XCTAssertTrue(moves.allSatisfy { !$0.text.isEmpty && $0.seconds >= 45 })
     }
 
     func testDefaultsAndSkipsUntitled() {
@@ -95,5 +136,25 @@ final class MovesTests: XCTestCase {
             XCTAssertEqual(Moves.pick(moves, avoiding: ["A", "B"], using: &rng)?.title, "C")
         }
         XCTAssertNotNil(Moves.pick(moves, avoiding: ["A", "B", "C"], using: &rng))
+    }
+
+    func testPickLeavesOutMovesTurnedOff() {
+        let moves = Moves.parse("# A\n---\n# B")
+        var rng = SystemRandomNumberGenerator()
+        for _ in 0..<20 { XCTAssertEqual(Moves.pick(moves, avoiding: [], off: ["A"], using: &rng)?.title, "B") }
+        // All turned off: still picks something rather than nothing.
+        XCTAssertNotNil(Moves.pick(moves, avoiding: [], off: ["A", "B"], using: &rng))
+    }
+
+    func testPickPrefersAKindWhenAsked() {
+        let moves = Moves.parse("# A\n---\n# B\nkind: vigorous\n---\n# C")
+        var rng = SystemRandomNumberGenerator()
+        for _ in 0..<20 { XCTAssertEqual(Moves.pick(moves, avoiding: ["B"], kind: "vigorous", using: &rng)?.title, "B") }
+        XCTAssertNotNil(Moves.pick(moves, avoiding: [], kind: "walk", using: &rng))
+    }
+
+    func testEveryThirdSnackIsVigorous() {
+        XCTAssertEqual((1...9).map { Moves.kind(forSnack: $0) },
+                       [nil, nil, "vigorous", nil, nil, "vigorous", nil, nil, "vigorous"])
     }
 }

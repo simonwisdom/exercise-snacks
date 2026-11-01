@@ -20,6 +20,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSCalendarsFullAccessUsageDescription</key><string>Snacks keeps out of the minutes before a meeting and uses the end of one as a break.</string>
+  <key>NSCalendarsUsageDescription</key><string>Snacks keeps out of the minutes before a meeting and uses the end of one as a break.</string>
+  <key>NSFocusStatusUsageDescription</key><string>Snacks waits while a Focus is on.</string>
 </dict>
 </plist>
 PLIST
