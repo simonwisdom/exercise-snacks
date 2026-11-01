@@ -172,7 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func closeCard(_ outcome: Outcome) {
         guard let model = card else { return }
         Store.log(outcome.rawValue, model.move)
-        if outcome == .later { rhythm.snooze() } else { rhythm.reset() }
+        if outcome == .later { rhythm.snooze(TimeInterval(model.laterMinutes * 60)) } else { rhythm.reset() }
         card = nil
         fadeOut(panel)
         panel = nil
@@ -251,15 +251,15 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--snapshot" {
         let view = VStack(alignment: .leading, spacing: 16) {
             PromptView(model: CardModel(move: moves[0]), figureAt: 0.6)
             HStack(spacing: 16) {
-                SnackView(model: running, figureAt: 0.5).frame(width: 720, height: 450).clipped()
-                SnackView(model: finished, figureAt: 0).frame(width: 720, height: 450).clipped()
+                SnackView(model: running, figureAt: 0.5).frame(width: 1200, height: 750).clipped()
+                SnackView(model: finished, figureAt: 0).frame(width: 1200, height: 750).clipped()
             }
             ForEach([0.0, 0.5], id: \.self) { phase in
                 HStack(spacing: 10) {
                     ForEach(figures, id: \.self) { name in
                         VStack {
                             FigureView(figure: name, at: phase * FigureMove.named(name).period,
-                                       color: Color(red: 0.25, green: 0.55, blue: 0.42))
+                                       color: night.bg, thin: true)
                                 .frame(width: 80, height: 120)
                             Text(name).font(.caption)
                         }

@@ -137,6 +137,8 @@ struct FigureView: View {
     /// A fixed time to draw at (for snapshots); nil animates.
     var at: Double? = nil
     var color: Color = .accentColor
+    /// Fine lines and an outlined head, with no floor shadow.
+    var thin = false
 
     var body: some View {
         let move = FigureMove.named(figure)
@@ -155,14 +157,17 @@ struct FigureView: View {
             let ox = (size.width - 100 * scale) / 2
             func pt(_ q: CGPoint) -> CGPoint { CGPoint(x: ox + q.x * scale, y: size.height - q.y * scale) }
 
-            let shadow = CGRect(x: ox + 25 * scale, y: size.height - 5 * scale, width: 50 * scale, height: 8 * scale)
-            ctx.fill(Path(ellipseIn: shadow), with: .color(color.opacity(0.15)))
+            if !thin {
+                let shadow = CGRect(x: ox + 25 * scale, y: size.height - 5 * scale, width: 50 * scale, height: 8 * scale)
+                ctx.fill(Path(ellipseIn: shadow), with: .color(color.opacity(0.15)))
+            }
+            let line = (thin ? 1.6 : 6) * scale
 
             if let x = move.wallX {
                 var wall = Path()
                 wall.move(to: pt(p(x, 0)))
                 wall.addLine(to: pt(p(x, 150)))
-                ctx.stroke(wall, with: .color(.secondary.opacity(0.5)), style: StrokeStyle(lineWidth: 3 * scale))
+                ctx.stroke(wall, with: .color(color.opacity(0.3)), style: StrokeStyle(lineWidth: line / 2))
             }
 
             let pose = move.pose(t)
@@ -174,9 +179,10 @@ struct FigureView: View {
                 for q in limb.dropFirst() { body.addLine(to: pt(q)) }
             }
             ctx.stroke(body, with: .color(color),
-                       style: StrokeStyle(lineWidth: 6 * scale, lineCap: .round, lineJoin: .round))
+                       style: StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round))
             let r = 9 * scale, h = pt(pose.head)
-            ctx.fill(Path(ellipseIn: CGRect(x: h.x - r, y: h.y - r, width: 2 * r, height: 2 * r)), with: .color(color))
+            let head = Path(ellipseIn: CGRect(x: h.x - r, y: h.y - r, width: 2 * r, height: 2 * r))
+            if thin { ctx.stroke(head, with: .color(color), lineWidth: line) } else { ctx.fill(head, with: .color(color)) }
         }
     }
 }

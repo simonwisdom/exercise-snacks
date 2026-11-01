@@ -6,7 +6,18 @@ enum Outcome: String {
     case done, stopped, later, away
 }
 
-let sage = Color(red: 0.25, green: 0.55, blue: 0.42)
+/// The look, after Endel's calm screens: deep night blue, faint rings, thin light type.
+enum night {
+    static let bg = Color(red: 0.043, green: 0.051, blue: 0.094)
+    static let ink = Color(red: 0.91, green: 0.92, blue: 1.0)
+    static let soft = Color(red: 0.78, green: 0.80, blue: 0.87)
+    static let muted = Color(red: 0.48, green: 0.50, blue: 0.63)
+    static let line = Color(red: 0.81, green: 0.84, blue: 1.0)
+    static let edge = Color(red: 0.29, green: 0.31, blue: 0.44)
+}
+
+/// "0:32" for 32 seconds.
+func clock(_ seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
 
 final class CardModel: ObservableObject {
     enum Stage { case offer, running, finished }
@@ -14,6 +25,8 @@ final class CardModel: ObservableObject {
     @Published var move: Move
     @Published var stage: Stage = .offer
     @Published var remaining: Int = 0
+    /// How long "Later" puts the next snack off.
+    var laterMinutes = 5
 
     /// Swaps in another move; set by whoever shows the card.
     var another: () -> Move? = { nil }
@@ -50,7 +63,7 @@ final class CardModel: ObservableObject {
     }
 
     func stop() { timer?.invalidate(); onEnd(.stopped) }
-    func later() { onEnd(.later) }
+    func later(_ minutes: Int) { laterMinutes = minutes; onEnd(.later) }
 
     func swap() {
         guard let next = another() else { return }
@@ -61,20 +74,42 @@ final class CardModel: ObservableObject {
     deinit { timer?.invalidate() }
 }
 
-/// A button drawn by hand, so it keeps its colour in a window that isn't focused.
-struct PillButton: View {
+/// Faint rings around a centre that breathe slowly; still when `at` is set.
+struct Rings: View {
+    var count = 4
+    var at: Double? = nil
+
+    var body: some View {
+        if let at { draw(at) } else { TimelineView(.animation) { tl in draw(tl.date.timeIntervalSinceReferenceDate) } }
+    }
+
+    private func draw(_ t: Double) -> some View {
+        Canvas { ctx, size in
+            let c = CGPoint(x: size.width / 2, y: size.height / 2)
+            let step = max(size.width, size.height) / CGFloat(2 * count + 2)
+            for i in 0..<count {
+                let breathe = 1 + 0.04 * sin(t * 2 * .pi / 8 - Double(i) * 0.6)
+                let r = step * CGFloat(i + 1) * 1.2 * breathe
+                let ring = Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+                ctx.stroke(ring, with: .color(night.line.opacity(0.5 - 0.11 * Double(i))), lineWidth: 1)
+            }
+        }
+    }
+}
+
+/// A small text button for the dark card and screen.
+struct QuietButton: View {
     let title: String
-    var filled = true
-    var big = false
+    var outlined = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(big ? .title3.weight(.semibold) : .callout.weight(.semibold))
-                .foregroundStyle(filled ? Color.white : Color.primary)
-                .padding(.horizontal, big ? 22 : 14).padding(.vertical, big ? 8 : 4)
-                .background(filled ? sage : Color.primary.opacity(0.08), in: Capsule())
+                .font(.system(size: 12, weight: outlined ? .regular : .light))
+                .foregroundStyle(outlined ? night.ink : night.muted)
+                .padding(.horizontal, outlined ? 14 : 6).padding(.vertical, 5)
+                .overlay(Capsule().strokeBorder(outlined ? night.edge : .clear))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -88,25 +123,26 @@ struct PromptView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            FigureView(figure: model.move.figure, at: figureAt, color: sage)
-                .frame(width: 30, height: 44)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Snack time?").font(.headline)
-                Text("\(model.move.title) · \(model.move.seconds) s")
-                    .font(.callout).foregroundStyle(.secondary)
+            Rings(count: 3, at: figureAt).frame(width: 26, height: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("A short pause").font(.system(size: 13, weight: .light)).foregroundStyle(night.ink)
+                Text("\(model.move.title.lowercased()) · \(model.move.seconds) sec")
+                    .font(.system(size: 11, weight: .light)).foregroundStyle(night.muted)
             }
-            Spacer(minLength: 16)
-            PillButton(title: "Later", filled: false, action: model.later)
-            PillButton(title: "Yes", action: model.yes)
+            Spacer(minLength: 12)
+            QuietButton(title: "+5") { model.later(5) }
+            QuietButton(title: "+15") { model.later(15) }
+            QuietButton(title: "Begin", outlined: true, action: model.yes)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .frame(width: 380)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.quaternary))
+        .background(night.bg, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(night.edge.opacity(0.6)))
+        .environment(\.colorScheme, .dark)
     }
 }
 
-/// The full-screen snack: a big figure, what to do, and a countdown ring.
+/// The full-screen snack: faint rings, a thin figure, the name and the time.
 struct SnackView: View {
     @ObservedObject var model: CardModel
     var figureAt: Double? = nil
@@ -116,50 +152,45 @@ struct SnackView: View {
     }
 
     var body: some View {
+        GeometryReader { geo in screen(ring: min(420, geo.size.height * 0.4)) }
+            .environment(\.colorScheme, .dark)
+    }
+
+    private func screen(ring: CGFloat) -> some View {
         ZStack {
-            Color(red: 0.93, green: 0.96, blue: 0.93).ignoresSafeArea()
-            VStack(spacing: 28) {
-                Spacer()
-                FigureView(figure: model.move.figure, at: figureAt, color: sage)
-                    .frame(width: 220, height: 330)
-                Text(model.move.title)
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.12))
+            night.bg.ignoresSafeArea()
+            Rings(at: figureAt).ignoresSafeArea()
+            Circle().trim(from: 0, to: progress)
+                .stroke(night.line.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.linear(duration: 0.25), value: progress)
+                .frame(width: ring, height: ring)
+            FigureView(figure: model.move.figure, at: figureAt, color: night.ink, thin: true)
+                .frame(width: ring * 0.4, height: ring * 0.62)
+            VStack(spacing: 10) {
+                Text(model.move.title.lowercased())
+                    .font(.system(size: 22, weight: .light)).tracking(1.5)
+                    .foregroundStyle(night.soft)
                 Text(model.move.text)
-                    .font(.title2)
-                    .foregroundStyle(Color(white: 0.3))
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundStyle(night.muted)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 620)
-                ZStack {
-                    Circle().stroke(sage.opacity(0.15), lineWidth: 10)
-                    Circle().trim(from: 0, to: progress)
-                        .stroke(sage, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .animation(.linear(duration: 0.25), value: progress)
-                    if model.stage == .finished {
-                        Image(systemName: "checkmark").font(.system(size: 40, weight: .bold)).foregroundStyle(sage)
-                    } else {
-                        Text("\(model.remaining)")
-                            .font(.system(size: 40, weight: .semibold, design: .rounded).monospacedDigit())
-                            .foregroundStyle(Color(white: 0.12))
-                    }
-                }
-                .frame(width: 110, height: 110)
-                Text(model.stage == .finished ? "Done. Back to it." : " ")
-                    .font(.title3.weight(.medium)).foregroundStyle(sage)
+                    .frame(maxWidth: 520)
                 Spacer()
-                HStack(spacing: 24) {
-                    Button("Another move", action: model.swap)
-                    Button("Stop  esc", action: model.stop).keyboardShortcut(.cancelAction)
+                Text(model.stage == .finished ? "done. back to it." : clock(model.remaining))
+                    .font(.system(size: model.stage == .finished ? 22 : 44, weight: .ultraLight).monospacedDigit())
+                    .tracking(3)
+                    .foregroundStyle(night.soft)
+                HStack(spacing: 20) {
+                    QuietButton(title: "another move", action: model.swap)
+                    Button(action: model.stop) {
+                        Text("stop  esc").font(.system(size: 12, weight: .light)).foregroundStyle(night.muted)
+                    }
+                    .buttonStyle(.plain).keyboardShortcut(.cancelAction)
                 }
-                .buttonStyle(.plain)
-                .font(.callout)
-                .foregroundStyle(Color(white: 0.45))
                 .opacity(model.stage == .finished ? 0 : 1)
-                .padding(.bottom, 40)
             }
-            .padding(40)
+            .padding(.vertical, 50)
         }
-        .environment(\.colorScheme, .light)
     }
 }

@@ -60,6 +60,6 @@ public struct Rhythm {
     /// The snack was done (or skipped by stepping away): start counting again.
     public mutating func reset() { used = 0 }
 
-    /// "Later": come back after `snoozeFor` more seconds of use.
-    public mutating func snooze() { used = max(0, every - snoozeFor) }
+    /// "Later": come back after `seconds` more seconds of use (default `snoozeFor`).
+    public mutating func snooze(_ seconds: TimeInterval? = nil) { used = max(0, every - (seconds ?? snoozeFor)) }
 }

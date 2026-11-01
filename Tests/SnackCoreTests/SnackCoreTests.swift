@@ -54,6 +54,17 @@ final class RhythmTests: XCTestCase {
         XCTAssertTrue(use(&r, seconds: 61, paused))
     }
 
+    func testLaterChipsComeBackAfterFiveOrFifteenMinutes() {
+        var r = Rhythm()
+        _ = use(&r, seconds: 30 * 60, typing)
+        r.snooze(5 * 60)
+        XCTAssertFalse(use(&r, seconds: 4 * 60, paused))
+        XCTAssertTrue(use(&r, seconds: 61, paused))
+        r.snooze(15 * 60)
+        XCTAssertFalse(use(&r, seconds: 14 * 60, paused))
+        XCTAssertTrue(use(&r, seconds: 61, paused))
+    }
+
     func testResetStartsAgain() {
         var r = Rhythm()
         _ = use(&r, seconds: 30 * 60, typing)
