@@ -19,9 +19,11 @@ public struct Signals {
     /// The time of day, in hours (13.5 is half past one).
     public var hour: Double
 
-    public init(idle: TimeInterval, micInUse: Bool = false, fullScreen: Bool = false,
-                meetingSoon: Bool = false, meetingJustEnded: Bool = false, focusOn: Bool = false,
-                quiet: Bool = false, hour: Double = 10) {
+    public init(
+        idle: TimeInterval, micInUse: Bool = false, fullScreen: Bool = false,
+        meetingSoon: Bool = false, meetingJustEnded: Bool = false, focusOn: Bool = false,
+        quiet: Bool = false, hour: Double = 10
+    ) {
         self.idle = idle
         self.micInUse = micInUse
         self.fullScreen = fullScreen
@@ -65,8 +67,10 @@ public struct Rhythm {
     /// How long the current (or last) time away has lasted.
     private var awayFor: TimeInterval = 0
 
-    public init(every: TimeInterval = 30 * 60, awayAfter: TimeInterval = 5 * 60,
-                pauseAfter: TimeInterval = 4, snoozeFor: TimeInterval = 10 * 60) {
+    public init(
+        every: TimeInterval = 30 * 60, awayAfter: TimeInterval = 5 * 60,
+        pauseAfter: TimeInterval = 4, snoozeFor: TimeInterval = 10 * 60
+    ) {
         self.every = every
         self.awayAfter = awayAfter
         self.pauseAfter = pauseAfter
@@ -103,7 +107,10 @@ public struct Rhythm {
     public func wasAway(_ s: Signals) -> Bool { s.idle >= awayAfter }
 
     /// The snack was done (or skipped by stepping away): start counting again.
-    public mutating func reset() { used = 0; afterLunch = false }
+    public mutating func reset() {
+        used = 0
+        afterLunch = false
+    }
 
     /// "Later": come back after `seconds` more seconds of use (default `snoozeFor`).
     public mutating func snooze(_ seconds: TimeInterval? = nil) { used = max(0, every - (seconds ?? snoozeFor)) }

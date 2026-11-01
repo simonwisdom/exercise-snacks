@@ -1,7 +1,7 @@
 import AppKit
 import ServiceManagement
-import SwiftUI
 import SnackCore
+import SwiftUI
 
 /// Where the moves file and the log live.
 enum Store {
@@ -14,8 +14,9 @@ enum Store {
 
     static func off() -> Set<String> {
         let text = (try? String(contentsOf: offFile, encoding: .utf8)) ?? ""
-        return Set(text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty })
+        return Set(
+            text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty })
     }
 
     static func turnOff(_ title: String) {
@@ -31,8 +32,9 @@ enum Store {
         let iso = ISO8601DateFormatter()
         return text.split(separator: "\n").compactMap { line in
             guard let data = line.data(using: .utf8),
-                  let row = try? JSONSerialization.jsonObject(with: data) as? [String: String],
-                  let at = row["at"].flatMap(iso.date(from:)), at >= since else { return nil }
+                let row = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+                let at = row["at"].flatMap(iso.date(from:)), at >= since
+            else { return nil }
             return (row["event"] ?? "", row["move"] ?? "")
         }
     }
@@ -59,12 +61,16 @@ enum Store {
 
     /// One line per event, so we can later see which snacks get done and which get skipped.
     static func log(_ event: String, _ move: Move?) {
-        let line: [String: String] = ["at": ISO8601DateFormatter().string(from: Date()), "event": event,
-                                      "move": move?.title ?? ""]
+        let line: [String: String] = [
+            "at": ISO8601DateFormatter().string(from: Date()), "event": event,
+            "move": move?.title ?? "",
+        ]
         guard var data = try? JSONSerialization.data(withJSONObject: line, options: [.sortedKeys]) else { return }
         data.append(0x0A)
         if let h = try? FileHandle(forWritingTo: logFile) {
-            h.seekToEndOfFile(); h.write(data); try? h.close()
+            h.seekToEndOfFile()
+            h.write(data)
+            try? h.close()
         } else {
             try? data.write(to: logFile)
         }
@@ -117,7 +123,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             toggleLogin()
         }
         if CommandLine.arguments.contains("--demo") { showCard() }
-        if CommandLine.arguments.contains("--demo-full") { showCard(); goFull() }
+        if CommandLine.arguments.contains("--demo-full") {
+            showCard()
+            goFull()
+        }
     }
 
     private var isPaused: Bool {
@@ -131,7 +140,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let dt = now.timeIntervalSince(lastTick)
         lastTick = now
         let day = Calendar.current.startOfDay(for: now)
-        if day != today { today = day; shownToday = 0 }
+        if day != today {
+            today = day
+            shownToday = 0
+        }
         let hour = Calendar.current.component(.hour, from: now)
         let quiet = Settings.isQuiet(hour: hour) || shownToday >= Settings.dailyCap
         let signals = Mac.signals(meetings: meetings, quiet: quiet)
@@ -173,8 +185,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let host = NSHostingView(rootView: PromptView(model: model))
         let size = host.fittingSize
-        let panel = CardPanel(contentRect: NSRect(origin: .zero, size: size),
-                              styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let panel = CardPanel(
+            contentRect: NSRect(origin: .zero, size: size),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -201,12 +214,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func fadeIn(_ w: NSWindow) {
         w.alphaValue = 0
         w.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { $0.duration = 0.35; w.animator().alphaValue = 1 }
+        NSAnimationContext.runAnimationGroup {
+            $0.duration = 0.35
+            w.animator().alphaValue = 1
+        }
     }
 
     private func fadeOut(_ w: NSWindow?) {
-        NSAnimationContext.runAnimationGroup({ $0.duration = 0.3; w?.animator().alphaValue = 0 },
-                                             completionHandler: { w?.orderOut(nil) })
+        NSAnimationContext.runAnimationGroup(
+            {
+                $0.duration = 0.3
+                w?.animator().alphaValue = 0
+            },
+            completionHandler: { w?.orderOut(nil) })
     }
 
     /// Yes: the small card goes and the snack fills the screen, countdown running.
@@ -284,7 +304,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func snackNow() { showCard() }
-    @objc private func pauseHour() { pausedUntil = Date().addingTimeInterval(3600); Store.log("pause", nil) }
+    @objc private func pauseHour() {
+        pausedUntil = Date().addingTimeInterval(3600)
+        Store.log("pause", nil)
+    }
     @objc private func resume() { pausedUntil = nil }
     @objc private func quit() { NSApp.terminate(nil) }
 
@@ -297,7 +320,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func shareWeek() {
         guard let button = statusItem.button else { return }
-        NSSharingServicePicker(items: [Store.weekSummary()]).show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        NSSharingServicePicker(items: [Store.weekSummary()]).show(
+            relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
     @objc private func toggleLogin() {
@@ -319,7 +343,9 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--snapshot" {
         running.remaining = 17
         let finished = CardModel(move: moves[0])
         finished.stage = .finished
-        let figures = ["squat", "calf", "wallpush", "march", "lunge", "jacks", "armcircle", "reach", "twist", "neck", "chest"]
+        let figures = [
+            "squat", "calf", "wallpush", "march", "lunge", "jacks", "armcircle", "reach", "twist", "neck", "chest",
+        ]
         let view = VStack(alignment: .leading, spacing: 16) {
             PromptView(model: CardModel(move: moves[0]), figureAt: 0.6)
             HStack(spacing: 16) {
@@ -330,9 +356,11 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--snapshot" {
                 HStack(spacing: 10) {
                     ForEach(figures, id: \.self) { name in
                         VStack {
-                            FigureView(figure: name, at: phase * FigureMove.named(name).period,
-                                       color: night.bg, thin: true)
-                                .frame(width: 80, height: 120)
+                            FigureView(
+                                figure: name, at: phase * FigureMove.named(name).period,
+                                color: Night.bg, thin: true
+                            )
+                            .frame(width: 80, height: 120)
                             Text(name).font(.caption)
                         }
                     }

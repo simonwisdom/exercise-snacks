@@ -14,8 +14,11 @@ final class Meetings {
 
     func ask() {
         let done: (Bool, Error?) -> Void = { [weak self] ok, _ in self?.allowed = ok }
-        if #available(macOS 14, *) { store.requestFullAccessToEvents(completion: done) }
-        else { store.requestAccess(to: .event, completion: done) }
+        if #available(macOS 14, *) {
+            store.requestFullAccessToEvents(completion: done)
+        } else {
+            store.requestAccess(to: .event, completion: done)
+        }
     }
 
     /// Whether a meeting is on or about to start, and whether one just ended. Looked up once a minute.
@@ -23,8 +26,9 @@ final class Meetings {
         guard allowed else { return (false, false) }
         if now.timeIntervalSince(checked) < 60 { return cached }
         checked = now
-        let range = store.predicateForEvents(withStart: now.addingTimeInterval(-window),
-                                             end: now.addingTimeInterval(window), calendars: nil)
+        let range = store.predicateForEvents(
+            withStart: now.addingTimeInterval(-window),
+            end: now.addingTimeInterval(window), calendars: nil)
         let events = store.events(matching: range).filter {
             !$0.isAllDay && $0.status != .canceled && $0.availability != .free
         }
@@ -58,7 +62,8 @@ enum Settings {
     static var dailyCap: Int { UserDefaults.standard.integer(forKey: "dailyCap") }
 
     static func isQuiet(hour: Int) -> Bool {
-        quietFrom > quietUntil ? (hour >= quietFrom || hour < quietUntil)
-                               : (hour >= quietFrom && hour < quietUntil)
+        quietFrom > quietUntil
+            ? (hour >= quietFrom || hour < quietUntil)
+            : (hour >= quietFrom && hour < quietUntil)
     }
 }

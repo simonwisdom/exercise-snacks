@@ -1,5 +1,5 @@
-import SwiftUI
 import SnackCore
+import SwiftUI
 
 /// How a snack ended.
 enum Outcome: String {
@@ -7,7 +7,7 @@ enum Outcome: String {
 }
 
 /// The look, after Endel's calm screens: deep night blue, faint rings, thin light type.
-enum night {
+enum Night {
     static let bg = Color(red: 0.043, green: 0.051, blue: 0.094)
     static let ink = Color(red: 0.91, green: 0.92, blue: 1.0)
     static let soft = Color(red: 0.78, green: 0.80, blue: 0.87)
@@ -67,8 +67,14 @@ final class CardModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.onEnd(.done) }
     }
 
-    func stop() { timer?.invalidate(); onEnd(.stopped) }
-    func later(_ minutes: Int) { laterMinutes = minutes; onEnd(.later) }
+    func stop() {
+        timer?.invalidate()
+        onEnd(.stopped)
+    }
+    func later(_ minutes: Int) {
+        laterMinutes = minutes
+        onEnd(.later)
+    }
 
     func swap() { use(another()) }
     func dropMove() { use(notForMe()) }
@@ -89,7 +95,11 @@ struct Rings: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        if let at = at ?? (reduceMotion ? 0 : nil) { draw(at) } else { TimelineView(.animation) { tl in draw(tl.date.timeIntervalSinceReferenceDate) } }
+        if let at = at ?? (reduceMotion ? 0 : nil) {
+            draw(at)
+        } else {
+            TimelineView(.animation) { tl in draw(tl.date.timeIntervalSinceReferenceDate) }
+        }
     }
 
     private func draw(_ t: Double) -> some View {
@@ -100,7 +110,7 @@ struct Rings: View {
                 let breathe = 1 + 0.04 * sin(t * 2 * .pi / 8 - Double(i) * 0.6)
                 let r = step * CGFloat(i + 1) * 1.2 * breathe
                 let ring = Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
-                ctx.stroke(ring, with: .color(night.line.opacity(0.5 - 0.11 * Double(i))), lineWidth: 1)
+                ctx.stroke(ring, with: .color(Night.line.opacity(0.5 - 0.11 * Double(i))), lineWidth: 1)
             }
         }
     }
@@ -116,9 +126,9 @@ struct QuietButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: outlined ? .regular : .light))
-                .foregroundStyle(outlined ? night.ink : night.muted)
+                .foregroundStyle(outlined ? Night.ink : Night.muted)
                 .padding(.horizontal, outlined ? 14 : 6).padding(.vertical, 5)
-                .overlay(Capsule().strokeBorder(outlined ? night.edge : .clear))
+                .overlay(Capsule().strokeBorder(outlined ? Night.edge : .clear))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -134,9 +144,9 @@ struct PromptView: View {
         HStack(spacing: 12) {
             Rings(count: 3, at: figureAt).frame(width: 26, height: 26).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("A short pause").font(.system(size: 13, weight: .light)).foregroundStyle(night.ink)
+                Text("A short pause").font(.system(size: 13, weight: .light)).foregroundStyle(Night.ink)
                 Text("\(model.move.title.lowercased()) · \(length(model.move.seconds))")
-                    .font(.system(size: 11, weight: .light)).foregroundStyle(night.muted)
+                    .font(.system(size: 11, weight: .light)).foregroundStyle(Night.muted)
             }
             Spacer(minLength: 12)
             QuietButton(title: "+5") { model.later(5) }.accessibilityLabel("Later, in 5 minutes")
@@ -145,8 +155,8 @@ struct PromptView: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .frame(width: 380)
-        .background(night.bg, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(night.edge.opacity(0.6)))
+        .background(Night.bg, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Night.edge.opacity(0.6)))
         .environment(\.colorScheme, .dark)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Snack: \(model.move.title), \(model.move.seconds) seconds")
@@ -169,38 +179,39 @@ struct SnackView: View {
 
     private func screen(ring: CGFloat) -> some View {
         ZStack {
-            night.bg.ignoresSafeArea()
+            Night.bg.ignoresSafeArea()
             Rings(at: figureAt).ignoresSafeArea().accessibilityHidden(true)
             Circle().trim(from: 0, to: progress)
-                .stroke(night.line.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                .stroke(Night.line.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.25), value: progress)
                 .frame(width: ring, height: ring)
                 .accessibilityHidden(true)
-            FigureView(figure: model.move.figure, at: figureAt, color: night.ink, thin: true)
+            FigureView(figure: model.move.figure, at: figureAt, color: Night.ink, thin: true)
                 .frame(width: ring * 0.4, height: ring * 0.62)
                 .accessibilityLabel(model.move.title)
             VStack(spacing: 10) {
                 Text(model.move.title.lowercased())
                     .font(.system(size: 22, weight: .light)).tracking(1.5)
-                    .foregroundStyle(night.soft)
+                    .foregroundStyle(Night.soft)
                 Text(model.move.text)
                     .font(.system(size: 14, weight: .light))
-                    .foregroundStyle(night.muted)
+                    .foregroundStyle(Night.muted)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 520)
                 Spacer()
                 Text(model.stage == .finished ? "done. back to it." : clock(model.remaining))
                     .font(.system(size: model.stage == .finished ? 22 : 44, weight: .ultraLight).monospacedDigit())
                     .tracking(3)
-                    .foregroundStyle(night.soft)
+                    .foregroundStyle(Night.soft)
                     .accessibilityLabel(model.stage == .finished ? "Done" : "\(model.remaining) seconds left")
                 HStack(spacing: 20) {
-                    QuietButton(title: "another move  →", action: model.swap).keyboardShortcut(.rightArrow, modifiers: [])
+                    QuietButton(title: "another move  →", action: model.swap).keyboardShortcut(
+                        .rightArrow, modifiers: [])
                     QuietButton(title: "not for me", action: model.dropMove)
                         .accessibilityHint("Turns this move off. Turn moves back on from the menu.")
                     Button(action: model.stop) {
-                        Text("stop  esc").font(.system(size: 12, weight: .light)).foregroundStyle(night.muted)
+                        Text("stop  esc").font(.system(size: 12, weight: .light)).foregroundStyle(Night.muted)
                     }
                     .buttonStyle(.plain).keyboardShortcut(.cancelAction)
                 }

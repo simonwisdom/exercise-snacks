@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import SnackCore
 
 final class RhythmTests: XCTestCase {
@@ -79,7 +80,7 @@ final class RhythmTests: XCTestCase {
         _ = use(&r, seconds: 15 * 60, typing)
         XCTAssertFalse(r.tick(1, Signals(idle: 0.5, meetingJustEnded: true)))  // too early
         _ = use(&r, seconds: 6 * 60, typing)
-        XCTAssertTrue(r.tick(1, Signals(idle: 0.5, meetingJustEnded: true)))   // within 10 min of due
+        XCTAssertTrue(r.tick(1, Signals(idle: 0.5, meetingJustEnded: true)))  // within 10 min of due
     }
 
     func testLunchBreakBringsAWalkForward() {
@@ -149,12 +150,15 @@ final class MovesTests: XCTestCase {
     func testPickPrefersAKindWhenAsked() {
         let moves = Moves.parse("# A\n---\n# B\nkind: vigorous\n---\n# C")
         var rng = SystemRandomNumberGenerator()
-        for _ in 0..<20 { XCTAssertEqual(Moves.pick(moves, avoiding: ["B"], kind: "vigorous", using: &rng)?.title, "B") }
+        for _ in 0..<20 {
+            XCTAssertEqual(Moves.pick(moves, avoiding: ["B"], kind: "vigorous", using: &rng)?.title, "B")
+        }
         XCTAssertNotNil(Moves.pick(moves, avoiding: [], kind: "walk", using: &rng))
     }
 
     func testEveryThirdSnackIsVigorous() {
-        XCTAssertEqual((1...9).map { Moves.kind(forSnack: $0) },
-                       [nil, nil, "vigorous", nil, nil, "vigorous", nil, nil, "vigorous"])
+        XCTAssertEqual(
+            (1...9).map { Moves.kind(forSnack: $0) },
+            [nil, nil, "vigorous", nil, nil, "vigorous", nil, nil, "vigorous"])
     }
 }
