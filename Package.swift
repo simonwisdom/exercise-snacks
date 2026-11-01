@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "Snacks",
+    name: "ExerciseSnacks",
     platforms: [.macOS(.v13)],
     targets: [
         .target(name: "SnackCore", path: "Sources/SnackCore"),
-        .executableTarget(name: "Snacks", dependencies: ["SnackCore"], path: "Sources/Snacks"),
+        .executableTarget(name: "ExerciseSnacks", dependencies: ["SnackCore"], path: "Sources/ExerciseSnacks"),
         .testTarget(name: "SnackCoreTests", dependencies: ["SnackCore"], path: "Tests/SnackCoreTests"),
     ]
 )

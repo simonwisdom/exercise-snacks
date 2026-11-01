@@ -1,28 +1,29 @@
 #!/bin/sh
-# Builds Snacks.app in build/, ad-hoc signed. Run from the project folder.
+# Builds "Exercise Snacks.app" in build/, ad-hoc signed. Run from the project folder.
 set -e
 cd "$(dirname "$0")/.."
 swift build -c release
-APP=build/Snacks.app
+APP="build/Exercise Snacks.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-cp .build/release/Snacks "$APP/Contents/MacOS/Snacks"
+cp .build/release/ExerciseSnacks "$APP/Contents/MacOS/ExerciseSnacks"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Snacks</string>
-  <key>CFBundleIdentifier</key><string>com.simonwisdom.snacks</string>
-  <key>CFBundleExecutable</key><string>Snacks</string>
+  <key>CFBundleName</key><string>Exercise Snacks</string>
+  <key>CFBundleDisplayName</key><string>Exercise Snacks</string>
+  <key>CFBundleIdentifier</key><string>com.simonwisdom.exercise-snacks</string>
+  <key>CFBundleExecutable</key><string>ExerciseSnacks</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
-  <key>NSCalendarsFullAccessUsageDescription</key><string>Snacks keeps out of the minutes before a meeting and uses the end of one as a break.</string>
-  <key>NSCalendarsUsageDescription</key><string>Snacks keeps out of the minutes before a meeting and uses the end of one as a break.</string>
-  <key>NSFocusStatusUsageDescription</key><string>Snacks waits while a Focus is on.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key><string>Exercise Snacks keeps out of the minutes before a meeting and uses the end of one as a break.</string>
+  <key>NSCalendarsUsageDescription</key><string>Exercise Snacks keeps out of the minutes before a meeting and uses the end of one as a break.</string>
+  <key>NSFocusStatusUsageDescription</key><string>Exercise Snacks waits while a Focus is on.</string>
 </dict>
 </plist>
 PLIST

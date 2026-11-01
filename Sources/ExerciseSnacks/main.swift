@@ -6,7 +6,7 @@ import SwiftUI
 /// Where the moves file and the log live.
 enum Store {
     static let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Snacks", isDirectory: true)
+        .appendingPathComponent("Exercise Snacks", isDirectory: true)
     static let movesFile = folder.appendingPathComponent("moves.md")
     static let logFile = folder.appendingPathComponent("log.jsonl")
     /// Moves turned off with "not for me", one title a line.
@@ -108,7 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "figure.walk", accessibilityDescription: "Snacks")
+        statusItem.button?.image = NSImage(systemSymbolName: "figure.walk", accessibilityDescription: "Exercise Snacks")
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -334,7 +334,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 }
 
-// `Snacks --snapshot out.png` draws cards and every figure to a PNG without opening a window.
+// `ExerciseSnacks --snapshot out.png` draws cards and every figure to a PNG without opening a window.
 if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--snapshot" {
     MainActor.assumeIsolated {
         let moves = Moves.parse(Moves.seed)

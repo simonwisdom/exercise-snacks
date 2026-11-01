@@ -23,13 +23,13 @@ Needs macOS 13+ and Xcode or the Swift command-line tools.
 git clone https://github.com/simonwisdom/exercise-snacks.git
 cd exercise-snacks
 bin/build
-cp -R build/Snacks.app /Applications/
-open /Applications/Snacks.app --args --open-at-login
+cp -R "build/Exercise Snacks.app" /Applications/
+open "/Applications/Exercise Snacks.app" --args --open-at-login
 ```
 
 ## Make it yours
 
-Moves live in `~/Library/Application Support/Snacks/moves.md` (menu: **Edit moves…**), split by `---`:
+Moves live in `~/Library/Application Support/Exercise Snacks/moves.md` (menu: **Edit moves…**), split by `---`:
 
 ```markdown
 # squats
@@ -45,15 +45,15 @@ armcircle, reach, twist, neck, chest.
 Quiet hours and the daily limit of 10 cards:
 
 ```sh
-defaults write com.simonwisdom.snacks quietFrom -int 19
-defaults write com.simonwisdom.snacks quietUntil -int 7
-defaults write com.simonwisdom.snacks dailyCap -int 10
+defaults write com.simonwisdom.exercise-snacks quietFrom -int 19
+defaults write com.simonwisdom.exercise-snacks quietUntil -int 7
+defaults write com.simonwisdom.exercise-snacks dailyCap -int 10
 ```
 
 ## Development
 
 `swift test` runs the tests. `xcrun swift-format format -i -r Sources Tests Package.swift` formats the code.
-`Snacks --demo` shows the card, `--demo-full` the full-screen snack.
+`ExerciseSnacks --demo` shows the card, `--demo-full` the full-screen snack.
 
 ## Licence
 
