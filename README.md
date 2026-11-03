@@ -6,7 +6,7 @@ A macOS menu-bar app that offers a one-to-three-minute exercise snack after abou
 
 ## How it works
 
-- After 30 minutes of use it waits for a pause in your typing, then shows a small card: **+5**, **+15** or
+- After 30 minutes of use it waits for a pause in your typing, then shows a small card: **Skip**, **+5**, **+15** or
   **Begin**. Begin fills the screen with the move, a looping figure and a countdown.
 - It stays out of calls, full-screen apps, Focus, quiet hours (7pm–7am) and the five minutes before a
   meeting. The end of a meeting, or coming back from lunch, is a good moment for one.

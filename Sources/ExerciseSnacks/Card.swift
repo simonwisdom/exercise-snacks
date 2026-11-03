@@ -3,7 +3,7 @@ import SwiftUI
 
 /// How a snack ended.
 enum Outcome: String {
-    case done, stopped, later, away
+    case done, stopped, later, skipped, away
 }
 
 /// The look, after Endel's calm screens: deep night blue, faint rings, thin light type.
@@ -75,6 +75,8 @@ final class CardModel: ObservableObject {
         laterMinutes = minutes
         onEnd(.later)
     }
+    /// Skips this snack; the next one comes after the usual wait.
+    func skip() { onEnd(.skipped) }
 
     func swap() { use(another()) }
     func dropMove() { use(notForMe()) }
@@ -149,12 +151,13 @@ struct PromptView: View {
                     .font(.system(size: 11, weight: .light)).foregroundStyle(Night.muted)
             }
             Spacer(minLength: 12)
+            QuietButton(title: "Skip", action: model.skip).accessibilityLabel("Skip this one")
             QuietButton(title: "+5") { model.later(5) }.accessibilityLabel("Later, in 5 minutes")
             QuietButton(title: "+15") { model.later(15) }.accessibilityLabel("Later, in 15 minutes")
             QuietButton(title: "Begin", outlined: true, action: model.yes)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .frame(width: 380)
+        .frame(width: 420)
         .background(Night.bg, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Night.edge.opacity(0.6)))
         .environment(\.colorScheme, .dark)
